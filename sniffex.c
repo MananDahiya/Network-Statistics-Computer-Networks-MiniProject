@@ -1,12 +1,21 @@
 #include <pcap.h>
+
 #include <stdio.h>
+
 #include <string.h>
+
 #include <stdlib.h>
+
 #include <ctype.h>
+
 #include <errno.h>
+
 #include <sys/types.h>
+
 #include <sys/socket.h>
+
 #include <netinet/in.h>
+
 #include <arpa/inet.h>
 
 #define APP_NAME "sniffex"
@@ -99,7 +108,6 @@ void print_app_usage(void) {
   printf("Options:\n");
   printf("    interface    Listen on <interface> for packets.\n");
   printf("\n");
-
   return;
 }
 
@@ -170,15 +178,17 @@ void print_payload(const u_char * payload, int len) {
 
   /* data fits on one line */
   if (len <= line_width) {
+    printf("  \t\t");
     print_hex_ascii_line(ch, len, offset);
     return;
   }
 
   /* data spans multiple lines */
-  for (;;) {
+  while(1) {
     /* compute current line length */
     line_len = line_width % len_rem;
     /* print line */
+    printf("  \t\t");
     print_hex_ascii_line(ch, line_len, offset);
     /* compute total remaining */
     len_rem = len_rem - line_len;
@@ -189,6 +199,7 @@ void print_payload(const u_char * payload, int len) {
     /* check if we have line width chars or less */
     if (len_rem <= line_width) {
       /* print last line and get out */
+      printf("  \t\t");
       print_hex_ascii_line(ch, len_rem, offset);
       break;
     }
@@ -216,8 +227,7 @@ void got_packet(u_char * args,
   int size_tcp;
   int size_payload;
 
-  printf("\nPacket number %d:\n", count);
-  count++;
+  printf("\t\t-------- PACKET [Number : %d] --------\n\n", count++);
 
   /* define ethernet header */
   ethernet = (struct sniff_ethernet * )(packet);
@@ -226,56 +236,56 @@ void got_packet(u_char * args,
   ip = (struct sniff_ip * )(packet + SIZE_ETHERNET);
   size_ip = IP_HL(ip) * 4;
   if (size_ip < 20) {
-    printf("   * Invalid IP header length: %u bytes\n", size_ip);
+    printf("**\t\tInvalid IP header length: %u bytes\n", size_ip);
     return;
   }
 
   /* print source and destination IP addresses */
-  printf("       From: %s\n", inet_ntoa(ip -> ip_src));
-  printf("         To: %s\n", inet_ntoa(ip -> ip_dst));
+  printf("**\t\tFrom IP : %s\n", inet_ntoa(ip -> ip_src));
+  printf("**\t\tTo IP : %s\n", inet_ntoa(ip -> ip_dst));
 
   /* determine protocol */
   switch (ip -> ip_p) {
   case IPPROTO_TCP:
-    printf("   Protocol: TCP\n");
+    printf("**\t\tProtocol : TCP\n");
     break;
   case IPPROTO_UDP:
-    printf("   Protocol: UDP\n");
+    printf("**\t\tProtocol : UDP\n");
     break;
   case IPPROTO_ICMP:
-    printf("   Protocol: ICMP\n");
+    printf("**\t\tProtocol : ICMP\n");
     return;
   case IPPROTO_IP:
-    printf("   Protocol: IP\n");
+    printf("**\t\tProtocol : IP\n");
     return;
   default:
-    printf("   Protocol: unknown\n");
+    printf("**\t\tProtocol : Unknown\n");
     return;
   }
 
   /* define/compute tcp header offset */
   if (ip -> ip_p == IPPROTO_UDP) {
-    struct sniff_udp * udp_header;
-    udp_header = (struct udp_hdr * )(packet + SIZE_ETHERNET + size_ip);
-    printf("**\t\tSource Port : %u\n**\t\tDestination Port : %u\n", udp_header -> sport, udp_header -> dport);
-    printf("**\t\tUDP Datagram Length : %u\n", udp_header -> len / 256);
+    struct sniff_udp * udp;
+    udp = (struct sniff_udp * )(packet + SIZE_ETHERNET + size_ip);
+    printf("**\t\tSource Port : %u\n**\t\tDestination Port : %u\n", udp -> sport, udp -> dport);
+    printf("**\t\tUDP Datagram Length : %u\n", udp -> len / 256);
   } else {
 
     tcp = (struct sniff_tcp * )(packet + SIZE_ETHERNET + size_ip);
     size_tcp = TH_OFF(tcp) * 4;
     if (size_tcp < 20) {
-      printf("   * Invalid TCP header length: %u bytes\n", size_tcp);
+      printf("**\t\tInvalid TCP header length: %u bytes\n", size_tcp);
       return;
     }
 
-    printf("   Src port: %d\n", ntohs(tcp -> th_sport));
-    printf("   Dst port: %d\n", ntohs(tcp -> th_dport));
+    printf("**\t\tSource port : %d\n", ntohs(tcp -> th_sport));
+    printf("**\t\tDestination port : %d\n", ntohs(tcp -> th_dport));
 
-    printf("Packet capture length: %d\n", header -> caplen);
-    printf("Packet total length %d\n", header -> len);
+    printf("**\t\tPacket capture length : %d\n", header -> caplen);
+    printf("**\t\tPacket total length : %d\n", header -> len);
 
-    printf("Sequence number: %u\n", tcp -> th_seq);
-    printf("Acknowledgement number: %u\n", tcp -> th_ack);
+    printf("**\t\tSequence number : %u\n", tcp -> th_seq);
+    printf("**\t\tAcknowledgement number(Ack) : %u\n", tcp -> th_ack);
 
     /* define/compute tcp payload (segment) offset */
     payload = (u_char * )(packet + SIZE_ETHERNET + size_ip + size_tcp);
@@ -288,96 +298,60 @@ void got_packet(u_char * args,
      * treat it as a string.
      */
     if (size_payload > 0) {
-      printf("   Payload (%d bytes):\n", size_payload);
+      printf("**\t\tPayload (%d bytes) : \n\n", size_payload);
       print_payload(payload, size_payload);
     }
   }
-
+  printf("\n\t\t----------------------------------------\n\n");
   return;
 }
 
-void Parse() {
+void parse() {
   FILE * f;
   f = fopen("data.txt", "r");
-  char c = fgetc(f);
   char buf[256];
-  char File_Size[256];
-  char Data_Speed[256];
-  char Bit_Speed[256];
-  char Packet_Rate[256];
+  char temp[256];
   int count = 0;
   int i = 0, j = 0;
   float size, speed, Mbps, prate;
-  char Temporary[256];
-  while (fgets(buf, sizeof(buf), f) != NULL) {
-    if (count == 11) {
-      i = 0, j = 0;
-      Temporary[0] = '\0';
-      strcpy(Temporary, buf);
-      while (Temporary[i++] != ':');
-      while (Temporary[i] == ' ') i++;
-      while (Temporary[i] != ' ') {
-        Data_Speed[j] = Temporary[i];
-        i++, j++;
+  for (int count = 0; fgets(buf, sizeof(buf), f) != NULL && count < 15; count++) {
+    if (count < 11) {
+      continue;
+    }
+    i = 0, j = 0;
+    while (!isdigit(buf[i])) i++;
+    while (buf[i] != ' ') {
+      if (buf[i] != ',') {
+        temp[j++] = buf[i];
       }
-      speed = atof(Data_Speed);
-      printf("**\t\tAVERAGE SPEED(MBps)   : %4.2fMBps\n", speed);
-      count++;
-    } else if (count == 12) {
-      i = 0, j = 0;
-      Temporary[0] = '\0';
-      strcpy(Temporary, buf);
-      while (Temporary[i++] != ':');
-      while (Temporary[i] == ' ') i++;
-      while (Temporary[i] != ' ') {
-        Bit_Speed[j] = Temporary[i];
-        i++, j++;
-      }
-      Mbps = atof(Bit_Speed);
-      printf("**\t\tAVERAGE SPEED(Mbps)   : %4.2f Mbps\n", Mbps);
-      count++;
-    } else if (count == 13) {
-      i = 0, j = 0;
-      Temporary[0] = '\0';
-      strcpy(Temporary, buf);
-      while (Temporary[i++] != ':');
-      while (Temporary[i] == ' ') i++;
-
-      while (Temporary[i] != ' ') {
-        File_Size[j] = Temporary[i];
-        i++, j++;
-      }
-      size = atof(File_Size);
-      printf("**\t\tAVERAGE PACKET SIZE   : %4.2f bytes\n", size);
-      count++;
-    } else if (count == 14) {
-      i = 0, j = 0;
-      Temporary[0] = '\0';
-      strcpy(Temporary, buf);
-      while (Temporary[i] != ':')
-        i++;
       i++;
-      while (Temporary[i] == ' ')
-        i++;
-
-      while (Temporary[i] != ' ') {
-        Packet_Rate[j] = Temporary[i];
-        j++;
-        i++;
-      }
-      prate = atof(Packet_Rate);
+    }
+    temp[j++] = 0;
+    if (count == 11) {
+      speed = atof(temp);
+      printf("**\t\tAVERAGE SPEED(MBps)   : %4.2f MBps\n", speed / (1024.0f));
+    } else if (count == 12) {
+      Mbps = atof(temp);
+      printf("**\t\tAVERAGE SPEED(Mbps)   : %4.2f Mbps\n", Mbps / (1024.0f));
+    } else if (count == 13) {
+      size = atof(temp);
+      printf("**\t\tAVERAGE PACKET SIZE   : %4.2f bytes\n", size);
+    } else if (count == 14) {
+      prate = atof(temp);
       printf("**\t\tAVERAGE PACKET RATE/s : %4.2f kpackets/s\n", prate);
-      count++;
-    } else {
-      count++;
     }
   }
-  printf("**\t\tAVERAGE RTT           : %f seconds\n", (size * 2) / (speed * 1048576));
+  printf("**\t\tAVERAGE RTT           : %f seconds\n", size / (speed * 512));
+}
+
+void menu() {
+  system("clear");
+  printf("\n********************************* MENU ***********************************");
+  printf("\n\n**     Enter the file name with the .pcap extension for analysis        **");
+  printf("\n\n**       ==>   ");
 }
 
 int main(int argc, char ** argv) {
-
-  char * dev = NULL; /* capture device name */
   char errbuf[PCAP_ERRBUF_SIZE]; /* error Temporary */
   pcap_t * handle; /* packet capture handle */
 
@@ -387,27 +361,30 @@ int main(int argc, char ** argv) {
   bpf_u_int32 net = 0; /* ip */
   int num_packets = 0; /* number of packets to capture */
 
-  char FileName[100];
-  printf("Enter file name: ");
-  scanf("%s", FileName);
-  handle = pcap_open_offline(FileName, errbuf);
+  char fileName[100];
+  menu();
+  scanf("%s", fileName);
+  handle = pcap_open_offline(fileName, errbuf);
   if (handle == NULL) {
     fprintf(stderr, "Couldn't open device\n");
     exit(EXIT_FAILURE);
   }
-  
-  printf("Enter number of packets to be sniffed (Enter 0 for all): ");
-  scanf("%d", &num_packets);
-  if(num_packets == 0)
-    printf("Number of packets: All\n");
+  printf("\n**************************************************************************");
+  printf("\n\n**     Enter number of packets to be sniffed (Enter 0 for all):         **");
+  printf("\n\n**     ==>   ");
+  scanf("%d", & num_packets);
+  printf("\n**************************************************************************");
+  if (num_packets == 0)
+    printf("\n\n**     Number of packets : All\n");
   else
-    printf("Number of packets: %d\n", num_packets);
+    printf("\n\n**     Number of packets : %d\n", num_packets);
 
   /* make sure we're capturing on an Ethernet device [2] */
   if (pcap_datalink(handle) != DLT_EN10MB) {
     fprintf(stderr, "Not an Ethernet\n");
     exit(EXIT_FAILURE);
   }
+  printf("\n**************************************************************************\n\n");
 
   /* compile the filter expression */
   if (pcap_compile(handle, & fp, filter_exp, 0, net) == -1) {
@@ -430,14 +407,14 @@ int main(int argc, char ** argv) {
   pcap_freecode( & fp);
   pcap_close(handle);
 
-  char command[100];
-  sprintf(command, "capinfos %s > ./data.txt", FileName);
+  char command[200];
+  sprintf(command, "capinfos %s > ./data.txt", fileName);
   system(command);
-  puts("-----------------------------------");
-  Parse();
-  puts("-----------------------------------");
+  printf("\n\n********************** FINAL NETWORK STATISTICS **********************\n\n");
+  parse();
+  printf("\n\n***********************************************************************\n\n");
 
-  printf("\nCapture complete.\n");
+  printf("\nCapture complete.\n\n");
 
   return 0;
 }
